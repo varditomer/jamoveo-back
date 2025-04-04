@@ -1,34 +1,54 @@
-import { Injectable } from '@nestjs/common';
-import { MongoClient, Collection, Db } from 'mongodb';
+// src/database/database.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+import { MongoClient, Collection, Db, Document } from 'mongodb';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class DatabaseService {
-  private client: MongoClient;
-  private db: Db;
-  private readonly dbURL = 'mongodb://localhost:27017';
-  private readonly dbName = 'jamoveo';
+  private readonly logger = new Logger(DatabaseService.name);
+  private db: Db | null = null;
+  private client: MongoClient | null = null;
 
-  constructor() {
-    // Remove the deprecated options
-    this.client = new MongoClient(this.dbURL);
-    this.connect();
-  }
+  constructor(private configService: ConfigService) {}
 
-  private async connect() {
+  async getCollection<T extends Document = any>(
+    collectionName: string,
+  ): Promise<Collection<T>> {
     try {
-      await this.client.connect();
-      this.db = this.client.db(this.dbName);
-      console.log('Connected to MongoDB');
+      const db = await this.connect();
+      return db.collection<T>(collectionName);
     } catch (error) {
-      console.error('Cannot connect to MongoDB', error);
+      this.logger.error(`Failed to get collection ${collectionName}`, error);
       throw error;
     }
   }
 
-  async getCollection(collectionName: string): Promise<Collection> {
-    if (!this.db) {
-      await this.connect();
+  private async connect(): Promise<Db> {
+    if (this.db) return this.db;
+
+    try {
+      const dbUrl = this.configService.get<string>('MONGODB_URI');
+      const dbName = this.configService.get<string>('DB_NAME');
+
+      if (!dbUrl) {
+        throw new Error('MONGODB_URI environment variable is not set');
+      }
+
+      this.logger.log(`Connecting to MongoDB Atlas (database: ${dbName})`);
+      this.client = await MongoClient.connect(dbUrl);
+      this.db = this.client.db(dbName);
+      this.logger.log('Connected to MongoDB Atlas successfully');
+      return this.db;
+    } catch (error) {
+      this.logger.error('Failed to connect to MongoDB', error);
+      throw error;
     }
-    return this.db.collection(collectionName);
+  }
+
+  async onApplicationShutdown() {
+    if (this.client) {
+      await this.client.close();
+      this.logger.log('Disconnected from MongoDB');
+    }
   }
 }
