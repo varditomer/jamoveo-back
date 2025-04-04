@@ -25,6 +25,18 @@ export class AuthController {
     }
   }
 
+  @Post('register-admin')
+  async registerAdmin(@Body() createUserDto: CreateUserDto) {
+    try {
+      const user = await this.authService.register(createUserDto, true);
+      return { success: true, user };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Admin registration failed';
+      throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
+    }
+  }
+
   @Post('login')
   async login(@Body() loginUserDto: LoginUserDto) {
     try {

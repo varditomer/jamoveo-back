@@ -52,15 +52,23 @@ export class AuthService {
     return { user: userResponse, token };
   }
 
-  async register(createUserDto: CreateUserDto): Promise<UserResponse> {
+  async register(
+    createUserDto: CreateUserDto,
+    isAdmin: boolean = false,
+  ): Promise<UserResponse> {
     const { username, password, instrument } = createUserDto;
     const saltRounds = 10;
 
     this.logger.debug(`Auth service - register with username: ${username}`);
 
     // Validate input
-    if (!username || !password || !instrument) {
-      throw new Error('Missing required registration information');
+    if (!username || !password) {
+      throw new Error('Username and password are required');
+    }
+
+    // Only require instrument for non-admin users
+    if (!isAdmin && !instrument) {
+      throw new Error('Instrument is required for players');
     }
 
     // Check if username exists
@@ -78,8 +86,8 @@ export class AuthService {
     const newUser: User = {
       username,
       password: hash,
-      instrument,
-      role: 'player',
+      instrument: instrument || 'N/A', // Default value for admins
+      role: isAdmin ? 'admin' : 'player',
       createdAt: new Date(),
     };
 
