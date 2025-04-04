@@ -1,8 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { Logger } from '@nestjs/common';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Set global prefix for API routes
+  app.setGlobalPrefix('api');
 
   // Enable CORS with specific allowed origins
   app.enableCors({
@@ -11,6 +18,16 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Production static file serving
+  if (process.env.NODE_ENV === 'production') {
+    app.useStaticAssets(join(__dirname, '..', 'public'));
+    logger.log('Running in production mode');
+  } else {
+    logger.log('Running in development mode');
+  }
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  logger.log(`Server is running on port: ${port}`);
 }
 bootstrap();
